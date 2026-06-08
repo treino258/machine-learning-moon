@@ -1,6 +1,5 @@
 # Machine Learning Moon — EDA e Machine Learning para cultivo lunar
 
-Este documento descreve a parte que será entregue no trabalho: **EDA + Machine Learning**.
 
 ## O que foi implementado
 

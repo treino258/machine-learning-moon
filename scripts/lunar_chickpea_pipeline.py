@@ -474,7 +474,7 @@ Foi treinado um ensemble bootstrap de regressão Ridge, com alvo em escala `log1
 - `biomass_g`: biomassa seca estimada.
 - `total_seed`: quantidade estimada de sementes.
 - `height_cm`: altura estimada.
-- `survival_probability_pct`: porcentagem estimada de chance de sobrevivência, derivada de `mortality_probability` sem alterar o dataset aumentado.
+- `survival_probability_pct`: porcentagem estimada de chance de sobrevivência, derivada de `mortality_probability`
 
 Métricas em holdout interno:
 

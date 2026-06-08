@@ -40,7 +40,6 @@ Foi treinado um ensemble bootstrap de regressão Ridge, com alvo em escala `log1
 - `biomass_g`: biomassa seca estimada.
 - `total_seed`: quantidade estimada de sementes.
 - `height_cm`: altura estimada.
-- `survival_probability_pct`: porcentagem estimada de chance de sobrevivência, derivada de `mortality_probability` sem alterar o dataset aumentado.
 
 Métricas em holdout interno:
 
@@ -58,13 +57,9 @@ Métricas em holdout interno:
 3. **Gravidade × transpiração**: foi criada a variável `xylem_embolism_risk`, dependente de gravidade, transpiração e geometria do vaso/xilema. Ela não finge calibração empírica completa, mas torna explícito o risco de colapso hidráulico.
 4. **Modelo treinado e incerteza**: o modelo usa os coeficientes do ensemble treinado e mantém coeficientes bootstrap para intervalo P5–P95, além da previsão central. Assim, previsões em regiões pouco confiáveis aparecem com incerteza explícita.
 
-## Como executar
 
-```bash
-python scripts/lunar_chickpea_pipeline.py
-```
 
-Os principais entregáveis para o trabalho são o relatório EDA (`reports/eda_lunar_chickpea.md`), o dataset aumentado (`data/lunar_chickpea_augmented.csv`) e o modelo treinado (`models/lunar_chickpea_model.json`).
+Os principais entregáveis são o relatório EDA (`reports/eda_lunar_chickpea.md`), o dataset aumentado (`data/lunar_chickpea_augmented.csv`) e o modelo treinado (`models/lunar_chickpea_model.json`).
 
 ## Limitações científicas
 
