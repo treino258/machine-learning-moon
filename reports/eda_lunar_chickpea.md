@@ -62,7 +62,7 @@ Métricas em holdout interno:
 python scripts/lunar_chickpea_pipeline.py
 ```
 
-Depois abra `simulator/harvest_simulator.html` no navegador para ajustar parâmetros e prever colheitas futuras.
+Depois abra `simulator/harvest_simulator.html` no navegador para ajustar parâmetros e prever colheitas futuras. O simulador também mostra um cartão **Vai crescer?** com chance estimada de crescimento e tempo vivo aproximado em dias, calculados a partir dos riscos e das previsões já geradas, sem adicionar novas colunas ao dataset.
 
 ## Limitações científicas
 

@@ -15,7 +15,7 @@ Este documento descreve o pipeline de **EDA**, geração de cenários simulados 
   - pH, percloratos, partículas vítreas finas, transpiração e risco hidráulico.
 - Modelo de ML treinado de verdade: ensemble bootstrap de regressão Ridge em escala `log1p`.
 - Intervalo de incerteza P5–P95 para biomassa, sementes e altura.
-- Simulador web standalone para ajustar parâmetros e prever colheitas futuras.
+- Simulador web standalone para ajustar parâmetros, prever colheitas futuras e indicar se a planta provavelmente vai crescer ou não.
 
 ## Arquivos principais
 
@@ -48,8 +48,9 @@ simulator/harvest_simulator.html
    - biomassa seca (`biomass_g`);
    - sementes (`total_seed`);
    - altura (`height_cm`).
-3. Sempre compare a previsão central com o intervalo **P5–P95**. Intervalo amplo significa alta incerteza.
-4. Use os alertas de risco para evitar conclusões falsas em cenários extremos:
+3. Veja também o cartão **Vai crescer?**, que mostra chance estimada de crescimento e tempo vivo aproximado em dias, sem mudar o dataset.
+4. Sempre compare a previsão central com o intervalo **P5–P95**. Intervalo amplo significa alta incerteza.
+5. Use os alertas de risco para evitar conclusões falsas em cenários extremos:
    - alta letalidade por escuro;
    - alto risco hidráulico em 1/6g;
    - alta toxicidade por perclorato/partículas vítreas.
