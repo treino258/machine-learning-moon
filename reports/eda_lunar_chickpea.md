@@ -48,21 +48,18 @@ Métricas em holdout interno:
 | biomass_g | 0.682 | 1.810 | 0.798 |
 | total_seed | 1.131 | 4.341 | 0.235 |
 | height_cm | 2.149 | 4.438 | 0.646 |
+| survival_probability_pct | 2.267 | 3.447 | 0.988 |
 
 ## Correções dos pontos cegos
 
 1. **Toxicidade real do rególito lunar**: o dataset aumentado inclui `perchlorate_ppm`, `glass_fines_pct` e `toxicity_index`. Isso separa o efeito do simulante JSC-1A/similar do risco de partículas vítreas ultrafinas e sais oxidantes.
 2. **Escuridão de 14 dias não linear**: o modelo usa `dark_lethality_index`, uma função logística com comportamento de limiar. Em cenários de 14 dias com pouca luz auxiliar, o gerador cria probabilidade alta de mortalidade, evitando crescimento contínuo irreal.
 3. **Gravidade × transpiração**: foi criada a variável `xylem_embolism_risk`, dependente de gravidade, transpiração e geometria do vaso/xilema. Ela não finge calibração empírica completa, mas torna explícito o risco de colapso hidráulico.
-4. **Simulador treinado e incerteza**: o simulador usa os coeficientes do ensemble treinado e retorna intervalo P5–P95, além da previsão central. Assim, previsões em regiões pouco confiáveis aparecem com incerteza explícita.
+4. **Modelo treinado e incerteza**: o modelo usa os coeficientes do ensemble treinado e mantém coeficientes bootstrap para intervalo P5–P95, além da previsão central. Assim, previsões em regiões pouco confiáveis aparecem com incerteza explícita.
 
-## Como executar
 
-```bash
-python scripts/lunar_chickpea_pipeline.py
-```
 
-Depois abra `simulator/harvest_simulator.html` no navegador para ajustar parâmetros e prever colheitas futuras. O simulador também mostra um cartão **Vai crescer?** com chance estimada de crescimento e tempo vivo aproximado em dias, calculados a partir dos riscos e das previsões já geradas, sem adicionar novas colunas ao dataset.
+Os principais entregáveis são o relatório EDA (`reports/eda_lunar_chickpea.md`), o dataset aumentado (`data/lunar_chickpea_augmented.csv`) e o modelo treinado (`models/lunar_chickpea_model.json`).
 
 ## Limitações científicas
 

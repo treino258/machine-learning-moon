@@ -1,31 +1,28 @@
-# Machine Learning Moon — cultivo lunar de grão-de-bico
+# Machine Learning Moon — EDA e Machine Learning para cultivo lunar
 
-Este documento descreve o pipeline de **EDA**, geração de cenários simulados e **modelo preditivo de colheita lunar** usando o CSV em `data/` como base experimental.
 
 ## O que foi implementado
 
 - Leitura e normalização do CSV original de crescimento de grão-de-bico em simulante de rególito.
 - EDA por percentual de rególito e por cenário experimental/simulado.
-- Dataset aumentado com parâmetros lunares ajustáveis:
+- Dataset aumentado com parâmetros lunares simulados:
   - ciclo luz/escuridão e risco não linear de letalidade por 14 dias de noite lunar;
   - radiação diária;
   - gravidade 1/6g;
   - composição do substrato com rególito, vermicomposto/aditivos e micorrizas;
   - nutrientes extraídos inspirados em análises de disponibilidade N/P/K;
   - pH, percloratos, partículas vítreas finas, transpiração e risco hidráulico.
-- Modelo de ML treinado de verdade: ensemble bootstrap de regressão Ridge em escala `log1p`.
-- Intervalo de incerteza P5–P95 para biomassa, sementes e altura.
-- Simulador web standalone para ajustar parâmetros, prever colheitas futuras e indicar se a planta provavelmente vai crescer ou não.
+- Modelo de ML treinado: ensemble bootstrap de regressão Ridge em escala `log1p`.
+- Intervalo de incerteza P5–P95 para biomassa, sementes, altura e chance de sobrevivência.
 
-## Arquivos principais
+## Arquivos principais para entregar
 
 | Caminho | Descrição |
 | --- | --- |
-| `scripts/lunar_chickpea_pipeline.py` | Pipeline EDA + simulação + treino ML + exportação do simulador. |
-| `reports/eda_lunar_chickpea.md` | Relatório com EDA, métricas e correções dos pontos cegos. |
+| `scripts/lunar_chickpea_pipeline.py` | Pipeline EDA + simulação + treino ML + exportação dos artefatos. |
+| `reports/eda_lunar_chickpea.md` | Relatório com EDA, métricas do modelo e correções dos pontos cegos. |
 | `data/lunar_chickpea_augmented.csv` | Dataset aumentado com cenários lunares simulados. |
-| `models/lunar_chickpea_model.json` | Modelo treinado, coeficientes bootstrap e métricas. |
-| `simulator/harvest_simulator.html` | Simulador interativo para previsão de biomassa, sementes e altura. |
+| `models/lunar_chickpea_model.json` | Modelo treinado, coeficientes bootstrap, médias/escalas e métricas. |
 
 ## Como executar
 
@@ -35,33 +32,30 @@ O pipeline usa apenas a biblioteca padrão do Python, sem dependências externas
 python scripts/lunar_chickpea_pipeline.py
 ```
 
-Após executar, abra o arquivo abaixo em um navegador:
+Esse comando gera/atualiza:
 
-```bash
-simulator/harvest_simulator.html
-```
+- `data/lunar_chickpea_augmented.csv`
+- `models/lunar_chickpea_model.json`
+- `reports/eda_lunar_chickpea.md`
 
-## Como interpretar o simulador
+## Resultados previstos pelo ML
 
-1. Ajuste o percentual de rególito, vermicomposto, micorrizas, luz, período de escuridão, radiação, gravidade e nutrientes.
-2. Observe as previsões centrais de:
-   - biomassa seca (`biomass_g`);
-   - sementes (`total_seed`);
-   - altura (`height_cm`).
-3. Veja também o cartão **Vai crescer?**, que mostra chance estimada de crescimento e tempo vivo aproximado em dias, sem mudar o dataset.
-4. Sempre compare a previsão central com o intervalo **P5–P95**. Intervalo amplo significa alta incerteza.
-5. Use os alertas de risco para evitar conclusões falsas em cenários extremos:
-   - alta letalidade por escuro;
-   - alto risco hidráulico em 1/6g;
-   - alta toxicidade por perclorato/partículas vítreas.
+O modelo prevê quatro saídas:
+
+1. `biomass_g`: biomassa seca estimada em gramas.
+2. `total_seed`: quantidade estimada de sementes.
+3. `height_cm`: altura estimada em centímetros.
+4. `survival_probability_pct`: porcentagem estimada de chance de sobrevivência.
+
+Cada saída possui previsão central e coeficientes bootstrap para calcular intervalo de incerteza P5–P95.
 
 ## Pontos cegos corrigidos
 
 - O simulante de rególito não é tratado como equivalente perfeito ao rególito lunar real: o pipeline adiciona perclorato, partículas vítreas finas e índice de toxicidade.
 - A noite lunar de 14 dias não é modelada como estresse linear simples: foi incluído índice de letalidade com comportamento de limiar.
 - A interação gravidade × transpiração não é apenas multiplicativa: o modelo inclui risco de embolia/colapso hidráulico dependente de baixa gravidade, transpiração e geometria.
-- O simulador não usa só fórmula manual: ele carrega coeficientes de um modelo treinado e mostra incerteza por ensemble bootstrap.
+- As previsões têm incerteza explícita por ensemble bootstrap.
 
 ## Limitação importante
 
-As linhas lunares são cenários simulados calibrados qualitativamente a partir do experimento original. O resultado é útil para triagem, planejamento e hipóteses, mas não substitui validação em câmara lunar, testes de radiação, estudos de 1/6g e análise química real do substrato.
+As linhas lunares são cenários simulados calibrados qualitativamente a partir do experimento original. O resultado é útil para EDA, Machine Learning, triagem e planejamento experimental, mas não substitui validação em câmara lunar, testes de radiação, estudos de 1/6g e análise química real do substrato.

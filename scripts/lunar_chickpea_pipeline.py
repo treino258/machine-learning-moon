@@ -9,7 +9,6 @@ parameters, trains bootstrap ridge-regression ensembles, and exports:
 - reports/eda_lunar_chickpea.md
 - data/lunar_chickpea_augmented.csv
 - models/lunar_chickpea_model.json
-- simulator/harvest_simulator.html
 """
 from __future__ import annotations
 
@@ -27,9 +26,8 @@ RAW_CSV = ROOT / "data" / "Bioremediation of Lunar Regolith Simulant1 Through My
 AUGMENTED_CSV = ROOT / "data" / "lunar_chickpea_augmented.csv"
 REPORT_MD = ROOT / "reports" / "eda_lunar_chickpea.md"
 MODEL_JSON = ROOT / "models" / "lunar_chickpea_model.json"
-SIMULATOR_HTML = ROOT / "simulator" / "harvest_simulator.html"
 SEED = 42
-TARGETS = ["biomass_g", "total_seed", "height_cm"]
+TARGETS = ["biomass_g", "total_seed", "height_cm", "survival_probability_pct"]
 FEATURES = [
     "intercept",
     "regolith_pct",
@@ -115,7 +113,7 @@ def risk_indices(row: Dict[str, float]) -> Dict[str, float]:
     dark_days = row["dark_days_continuous"]
     aux_light = row["light_hours"] / 24.0
     # C3 plants are not assumed to degrade smoothly through long darkness; a
-    # threshold-like lethality term is exposed and used by both ML and simulator.
+    # threshold-like lethality term is exposed and used by the ML model.
     dark_lethality = 1.0 / (1.0 + math.exp(-(dark_days - 8.0 + 3.0 * aux_light) / 1.6))
 
     transpiration = row["transpiration_index"]
@@ -335,6 +333,12 @@ def quantile(values: Sequence[float], q: float) -> float:
     return sorted_values[lo] * (hi - idx) + sorted_values[hi] * (idx - lo)
 
 
+def target_value(row: Dict[str, float | int | str], target: str) -> float:
+    if target == "survival_probability_pct":
+        return max(0.0, min(100.0, 100.0 * (1.0 - float(row.get("mortality_probability", 0.0)))))
+    return float(row[target])
+
+
 def train_models(rows: List[Dict[str, float | int | str]]) -> Dict[str, object]:
     rng = random.Random(SEED)
     train_rows = [row for row in rows if float(row["biomass_g"]) >= 0 and float(row["height_cm"]) >= 0]
@@ -367,7 +371,7 @@ def train_models(rows: List[Dict[str, float | int | str]]) -> Dict[str, object]:
     train_idx = [i for i in split if i not in test_idx]
     test_idx_list = list(test_idx)
     for target in TARGETS:
-        y_all = [float(r[target]) for r in train_rows]
+        y_all = [target_value(r, target) for r in train_rows]
         ensembles = []
         for _ in range(80):
             sample_idx = [rng.choice(train_idx) for _ in train_idx]
@@ -470,6 +474,7 @@ Foi treinado um ensemble bootstrap de regressão Ridge, com alvo em escala `log1
 - `biomass_g`: biomassa seca estimada.
 - `total_seed`: quantidade estimada de sementes.
 - `height_cm`: altura estimada.
+- `survival_probability_pct`: porcentagem estimada de chance de sobrevivência, derivada de `mortality_probability`
 
 Métricas em holdout interno:
 
@@ -480,7 +485,7 @@ Métricas em holdout interno:
 1. **Toxicidade real do rególito lunar**: o dataset aumentado inclui `perchlorate_ppm`, `glass_fines_pct` e `toxicity_index`. Isso separa o efeito do simulante JSC-1A/similar do risco de partículas vítreas ultrafinas e sais oxidantes.
 2. **Escuridão de 14 dias não linear**: o modelo usa `dark_lethality_index`, uma função logística com comportamento de limiar. Em cenários de 14 dias com pouca luz auxiliar, o gerador cria probabilidade alta de mortalidade, evitando crescimento contínuo irreal.
 3. **Gravidade × transpiração**: foi criada a variável `xylem_embolism_risk`, dependente de gravidade, transpiração e geometria do vaso/xilema. Ela não finge calibração empírica completa, mas torna explícito o risco de colapso hidráulico.
-4. **Simulador treinado e incerteza**: o simulador usa os coeficientes do ensemble treinado e retorna intervalo P5–P95, além da previsão central. Assim, previsões em regiões pouco confiáveis aparecem com incerteza explícita.
+4. **Modelo treinado e incerteza**: o modelo usa os coeficientes do ensemble treinado e mantém coeficientes bootstrap para intervalo P5–P95, além da previsão central. Assim, previsões em regiões pouco confiáveis aparecem com incerteza explícita.
 
 ## Como executar
 
@@ -488,89 +493,13 @@ Métricas em holdout interno:
 python scripts/lunar_chickpea_pipeline.py
 ```
 
-Depois abra `simulator/harvest_simulator.html` no navegador para ajustar parâmetros e prever colheitas futuras. O simulador também mostra um cartão **Vai crescer?** com chance estimada de crescimento e tempo vivo aproximado em dias, calculados a partir dos riscos e das previsões já geradas, sem adicionar novas colunas ao dataset.
+Os principais entregáveis para o trabalho são o relatório EDA (`reports/eda_lunar_chickpea.md`), o dataset aumentado (`data/lunar_chickpea_augmented.csv`) e o modelo treinado (`models/lunar_chickpea_model.json`).
 
 ## Limitações científicas
 
 Este projeto combina dados reais em simulante com cenários sintéticos. As previsões devem ser usadas para triagem de hipóteses e desenho experimental, não como validação agronômica lunar. O melhor próximo passo é coletar dados em câmara controlada com radiação, períodos reais de escuridão, 1/6g simulada/análoga e medições de água no xilema.
 """
     REPORT_MD.write_text(text, encoding="utf-8")
-
-
-def write_simulator(model: Dict[str, object]) -> None:
-    embedded = json.dumps(model, ensure_ascii=False)
-    html = f"""<!doctype html>
-<html lang=\"pt-BR\">
-<head>
-  <meta charset=\"utf-8\" />
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>Simulador de colheita lunar - grão-de-bico</title>
-  <style>
-    body {{ font-family: system-ui, sans-serif; margin: 0; background: #0c1020; color: #f6f7fb; }}
-    main {{ max-width: 1120px; margin: auto; padding: 24px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 16px; }}
-    .card {{ background: #171d35; border: 1px solid #2b355d; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px #0005; }}
-    label {{ display: grid; gap: 6px; margin: 10px 0; font-size: 0.92rem; }}
-    input {{ width: 100%; accent-color: #9be564; }}
-    output {{ font-weight: 700; color: #9be564; }}
-    .result {{ font-size: 1.35rem; }}
-    .risk-high {{ color: #ff7676; }} .risk-med {{ color: #ffd166; }} .risk-low {{ color: #9be564; }}
-    small, p {{ color: #c9d2ef; line-height: 1.45; }}
-  </style>
-</head>
-<body>
-<main>
-  <h1>Simulador de previsão de colheita lunar</h1>
-  <p>Ajuste os parâmetros do ambiente para estimar biomassa, sementes e altura de grão-de-bico. O modelo é um ensemble Ridge treinado pelo pipeline do repositório e mostra intervalo P5–P95.</p>
-  <section class=\"grid\" id=\"controls\"></section>
-  <section class=\"grid\" id=\"results\"></section>
-  <section class=\"card\">
-    <h2>Alertas de pontos cegos corrigidos</h2>
-    <ul>
-      <li>Rególito real: inclua percloratos e partículas vítreas ultrafinas, não só percentual de simulante.</li>
-      <li>Escuridão: 14 dias sem luz auxiliar pode ser regime letal, não apenas estresse linear.</li>
-      <li>1/6g: risco hidráulico pode crescer por embolia/bolhas no xilema; ajuste transpiração e geometria.</li>
-      <li>Incerteza: sempre leia P5–P95; intervalos amplos indicam cenário fora da base de dados.</li>
-    </ul>
-  </section>
-</main>
-<script>
-const model = {embedded};
-const specs = [
-  ['regolith_pct','Rególito (%)',0,100,1,50],
-  ['vermicompost_pct','Vermicomposto/aditivos (%)',0,100,1,50],
-  ['mycorrhiza','Micorrizas (0/1)',0,1,1,1],
-  ['light_hours','Luz artificial por dia (h)',0,24,1,12],
-  ['dark_days_continuous','Escuridão contínua (dias)',0,14,0.5,7],
-  ['radiation_msv_day','Radiação (mSv/dia)',0,3,0.05,0.8],
-  ['gravity_g','Gravidade (g)',0.05,1,0.01,0.1667],
-  ['nitrogen_mg_kg','Nitrogênio extraído (mg/kg)',0,220,1,90],
-  ['phosphorus_mg_kg','Fósforo extraído (mg/kg)',0,90,1,28],
-  ['potassium_mg_kg','Potássio extraído (mg/kg)',0,320,1,160],
-  ['ph','pH',4,10,0.1,6.7],
-  ['perchlorate_ppm','Perclorato (ppm)',0,180,1,30],
-  ['glass_fines_pct','Partículas vítreas finas (%)',0,25,0.5,8],
-  ['transpiration_index','Índice de transpiração',0.1,2,0.05,0.9],
-  ['xylem_geometry_risk','Risco geométrico xilema/vaso',0,1,0.01,0.45]
-];
-function darkRisk(v) {{ return 1 / (1 + Math.exp(-((v.dark_days_continuous - 8 + 3 * (v.light_hours/24)) / 1.6))); }}
-function embolismRisk(v) {{ const lowG = Math.max(0, (0.38 - v.gravity_g) / 0.38); return Math.min(1, lowG * (0.45 + 0.75 * v.transpiration_index) * (0.55 + v.xylem_geometry_risk)); }}
-function toxicityRisk(v) {{ return Math.min(1, 0.55*v.glass_fines_pct/18 + 0.45*v.perchlorate_ppm/120 + 0.18*v.regolith_pct/100); }}
-function values() {{ const v = {{}}; specs.forEach(s => v[s[0]] = Number(document.getElementById(s[0]).value)); v.dark_lethality_index=darkRisk(v); v.xylem_embolism_risk=embolismRisk(v); v.toxicity_index=toxicityRisk(v); return v; }}
-function fv(v) {{ return model.features.map(f => f === 'intercept' ? 1 : ((v[f] - model.feature_means[f]) / model.feature_scales[f])); }}
-function dot(a,b) {{ return a.reduce((s,x,i)=>s+x*b[i],0); }}
-function percentile(xs, q) {{ const a=[...xs].sort((x,y)=>x-y), i=(a.length-1)*q, lo=Math.floor(i), hi=Math.ceil(i); return lo===hi?a[lo]:a[lo]*(hi-i)+a[hi]*(i-lo); }}
-function predictTarget(name, x) {{ const spec=model.targets[name]; const center=Math.max(0, Math.expm1(dot(spec.center_coefficients,x))); const boot=spec.bootstrap_coefficients.map(c => Math.max(0, Math.expm1(dot(c,x)))); return {{center, p05:percentile(boot,0.05), p95:percentile(boot,0.95)}}; }}
-function growthForecast(v, predictions) {{ const stress = Math.min(1, 0.55*v.dark_lethality_index + 0.30*v.xylem_embolism_risk + 0.25*v.toxicity_index + 0.08*v.radiation_msv_day); const viability = Math.max(0, Math.min(1, 1 - stress)); const biomassSignal = Math.min(1, predictions.biomass_g.center / 8); const heightSignal = Math.min(1, predictions.height_cm.center / 18); const seedSignal = Math.min(1, predictions.total_seed.center / 12); const growProbability = Math.max(0, Math.min(1, 0.55*viability + 0.25*biomassSignal + 0.15*heightSignal + 0.05*seedSignal)); const aliveDays = Math.max(0, Math.min(120, 120 * Math.pow(growProbability, 1.25) * (1 - 0.55*v.dark_lethality_index))); const label = growProbability >= 0.66 ? 'Provável que cresça' : growProbability >= 0.35 ? 'Crescimento incerto' : 'Provável que não cresça'; return {{growProbability, aliveDays, label}}; }}
-function riskClass(x) {{ return x > 0.66 ? 'risk-high' : x > 0.33 ? 'risk-med' : 'risk-low'; }}
-function render() {{ const v=values(), x=fv(v); const labels={{biomass_g:'Biomassa seca (g)', total_seed:'Sementes', height_cm:'Altura (cm)'}}; const predictions={{}}; let html=''; for (const t of Object.keys(labels)) {{ const p=predictTarget(t,x); predictions[t]=p; html += `<div class="card"><h2>${{labels[t]}}</h2><div class="result">${{p.center.toFixed(2)}}</div><small>P5–P95: ${{p.p05.toFixed(2)}} a ${{p.p95.toFixed(2)}}</small></div>`; }} const growth=growthForecast(v,predictions); html += `<div class="card"><h2>Vai crescer?</h2><div class="result ${{riskClass(1-growth.growProbability)}}">${{growth.label}}</div><p>Chance estimada: ${{(100*growth.growProbability).toFixed(0)}}%</p><small>Tempo vivo estimado: ~${{growth.aliveDays.toFixed(0)}} dias. Estimativa qualitativa derivada dos riscos e do modelo, sem alterar o dataset.</small></div>`; html += `<div class="card"><h2>Riscos</h2><p class="${{riskClass(v.dark_lethality_index)}}">Letalidade por escuro: ${{(100*v.dark_lethality_index).toFixed(0)}}%</p><p class="${{riskClass(v.xylem_embolism_risk)}}">Risco hidráulico 1/6g: ${{(100*v.xylem_embolism_risk).toFixed(0)}}%</p><p class="${{riskClass(v.toxicity_index)}}">Toxicidade do rególito: ${{(100*v.toxicity_index).toFixed(0)}}%</p></div>`; document.getElementById('results').innerHTML=html; }}
-function init() {{ document.getElementById('controls').innerHTML = specs.map(s => `<div class=\"card\"><label>${{s[1]}} <output id=\"${{s[0]}}_out\">${{s[5]}}</output><input id=\"${{s[0]}}\" type=\"range\" min=\"${{s[2]}}\" max=\"${{s[3]}}\" step=\"${{s[4]}}\" value=\"${{s[5]}}\"></label></div>`).join(''); specs.forEach(s => document.getElementById(s[0]).addEventListener('input', e => {{ document.getElementById(`${{s[0]}}_out`).value=e.target.value; render(); }})); render(); }}
-init();
-</script>
-</body>
-</html>
-"""
-    SIMULATOR_HTML.write_text(html, encoding="utf-8")
 
 
 def main() -> None:
@@ -580,12 +509,10 @@ def main() -> None:
     model = train_models(augmented)
     MODEL_JSON.write_text(json.dumps(model, indent=2, ensure_ascii=False), encoding="utf-8")
     write_report(raw_rows, augmented, model)
-    write_simulator(model)
     print(f"Raw rows: {len(raw_rows)}")
     print(f"Augmented rows: {len(augmented)}")
     print(f"Report: {REPORT_MD.relative_to(ROOT)}")
     print(f"Model: {MODEL_JSON.relative_to(ROOT)}")
-    print(f"Simulator: {SIMULATOR_HTML.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
